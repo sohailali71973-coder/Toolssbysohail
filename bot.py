@@ -29,7 +29,6 @@ STARTING_CREDITS = 3
 DAILY_REWARD = 1
 REFERRAL_REWARD = 3
 
-# Naye APIs Update kar diye hain:
 API_KEY = "MY_TEST_KEY_123"
 API3_URL = f"https://nitin-developer-api-paid.nitinshab43.workers.dev/api?action=num&key={API_KEY}&number="
 API4_URL = f"https://nitin-developer-api-paid.nitinshab43.workers.dev/api?action=aadhar&key={API_KEY}&aadhar="
@@ -305,7 +304,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # --- SEARCH PROMPTS ---
     if data == "vehicle":
         context.user_data["waiting_for"] = "vehicle"
         await query.edit_message_text(
@@ -356,7 +354,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # --- ADMIN HANDLERS ---
     if data == "admin":
         if user.id != ADMIN_ID:
             return
@@ -445,7 +442,7 @@ async def handle_spin(query, user_id):
 
 
 # ==================================================
-# TEXT HANDLER (APIs & ADMIN INPUTS)
+# TEXT HANDLER
 # ==================================================
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -456,7 +453,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not waiting_for:
         return
 
-    # Generic API Fetcher Function
     async def fetch_api_result(api_endpoint, title_name):
         context.user_data.pop("waiting_for", None)
         if get_credits(user.id) < 1:
@@ -484,7 +480,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             await update.message.reply_text("❌ API request failed. Please try again later.")
 
-    # Route Actions
     if waiting_for == "vehicle":
         await fetch_api_result("https://nitin-api-free-user-1k-spacial.vercel.app/api?type=vehicle&search=", "VEHICLE")
         return
@@ -505,7 +500,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await fetch_api_result(API5_URL, "UPI SEARCH")
         return
 
-    # Redeem Handler
     if waiting_for == "redeem":
         context.user_data.pop("waiting_for", None)
         code = text.upper()
@@ -540,7 +534,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Admin Controls
     if waiting_for == "admin_add":
         if user.id != ADMIN_ID:
             return
