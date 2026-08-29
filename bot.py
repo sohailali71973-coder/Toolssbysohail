@@ -13,6 +13,12 @@ BOT_TOKEN = "8659882105:AAFrCNFCjMM3hCWXlPPg9HdC1bc756XR0FQ"
 ADMIN_ID = 7394600693
 API_KEY = "MY_TEST_KEY_123"
 
+# Logging setup
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
 # Setup Database
 conn = sqlite3.connect("bot_database.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -24,7 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
     credits INTEGER DEFAULT 3,
     referred_by INTEGER,
     daily_time TEXT,
-    spin_time TEXT
+    spin_time TEXT,
+    is_blocked INTEGER DEFAULT 0
 )
 ''')
 
@@ -45,106 +52,139 @@ CREATE TABLE IF NOT EXISTS redeemed (
 ''')
 conn.commit()
 
-# Helper function to check and deduct credits
-def deduct_credit(user_id):
-    cursor.execute("SELECT credits FROM users WHERE user_id = ?", (user_id,))
+# Helper function to check block status & deduct credits
+def check_user_and_deduct(user_id):
+    cursor.execute("SELECT credits, is_blocked FROM users WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
-    if not res or res[0] < 1:
-        return False
+    if not res:
+        return "not_found"
+    if res[1] == 1:
+        return "blocked"
+    if res[0] < 1:
+        return "no_credits"
+
     cursor.execute("UPDATE users SET credits = credits - 1 WHERE user_id = ?", (user_id,))
     conn.commit()
-    return True
+    return "ok"
 
 # --- API HANDLERS ---
 async def fetch_pincode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    status = check_user_and_deduct(user_id)
+    if status == "blocked":
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
+    if status == "no_credits":
+        return await update.message.reply_text("❌ Insufficient Credits! Earn credits using daily rewards.")
     if not context.args:
         return await update.message.reply_text("❌ Usage: /pincode 411001")
-    
-    if not deduct_credit(user_id):
-        return await update.message.reply_text("❌ Insufficient Credits! Daily Claim ya Spin karke credits earn karo.")
 
     query = context.args[0]
     await update.message.reply_text("🔎 Fetching Pincode Info...")
     try:
         url = f"https://nitin-api-free-user-1k-spacial.vercel.app/api?type=pincode&search={query}"
-        res = requests.get(url, timeout=10).text
-        await update.message.reply_text(f"📍 **Pincode Result:**\n\n`{res[:3500]}`", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text("❌ API Server Response Error.")
+        res = requests.get(url, timeout=12).text
+        formatted = res.replace('"owner": "@FizzaGirl"', '"owner": "@Toolssbysohail"') \
+                       .replace('FizzaGirl', 'sohailcyberexpert')
+        await update.message.reply_text(f"📍 **Pincode Result:**\n\n```json\n{formatted[:3500]}\n```", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ API Server Error.")
 
 async def fetch_vehicle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    status = check_user_and_deduct(user_id)
+    if status == "blocked":
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
+    if status == "no_credits":
+        return await update.message.reply_text("❌ Insufficient Credits!")
     if not context.args:
         return await update.message.reply_text("❌ Usage: /vehicle RJ14CV0002")
 
-    if not deduct_credit(user_id):
-        return await update.message.reply_text("❌ Insufficient Credits!")
-
-    query = context.args[0]
+    query = context.args[0].upper()
     await update.message.reply_text("🔎 Fetching Vehicle Info...")
     try:
         url = f"https://nitin-api-free-user-1k-spacial.vercel.app/api?type=vehicle&search={query}"
-        res = requests.get(url, timeout=10).text
-        await update.message.reply_text(f"🚘 **Vehicle Result:**\n\n`{res[:3500]}`", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text("❌ API Server Response Error.")
+        res = requests.get(url, timeout=12)
+        if res.status_code == 200 and res.text:
+            formatted = res.text.replace('"owner": "@FizzaGirl"', '"owner": "@Toolssbysohail"') \
+                                .replace('FizzaGirl', 'sohailcyberexpert')
+            await update.message.reply_text(f"🚘 **Vehicle Result:**\n\n```json\n{formatted[:3500]}\n```", parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ Vehicle details nahi mile ya API response blank hai.")
+    except Exception:
+        await update.message.reply_text("❌ Server response error. Thodi der baad try karein.")
 
 async def fetch_num(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    status = check_user_and_deduct(user_id)
+    if status == "blocked":
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
+    if status == "no_credits":
+        return await update.message.reply_text("❌ Insufficient Credits!")
     if not context.args:
         return await update.message.reply_text("❌ Usage: /num 9876543210")
-
-    if not deduct_credit(user_id):
-        return await update.message.reply_text("❌ Insufficient Credits!")
 
     query = context.args[0]
     await update.message.reply_text("🔎 Fetching Number Info...")
     try:
         url = f"https://nitin-developer-api-paid.nitinshab43.workers.dev/api?action=num&number={query}&key={API_KEY}"
-        res = requests.get(url, timeout=10).text
-        await update.message.reply_text(f"📞 **Number Result:**\n\n`{res[:3500]}`", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text("❌ API Server Response Error.")
+        res = requests.get(url, timeout=12).text
+        formatted = res.replace('"owner": "@FizzaGirl"', '"owner": "@Toolssbysohail"') \
+                       .replace('FizzaGirl', 'sohailcyberexpert')
+        await update.message.reply_text(f"📞 **Number Result:**\n\n```json\n{formatted[:3500]}\n```", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ API Server Error.")
 
 async def fetch_upi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    status = check_user_and_deduct(user_id)
+    if status == "blocked":
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
+    if status == "no_credits":
+        return await update.message.reply_text("❌ Insufficient Credits!")
     if not context.args:
         return await update.message.reply_text("❌ Usage: /upi example@ybl")
-
-    if not deduct_credit(user_id):
-        return await update.message.reply_text("❌ Insufficient Credits!")
 
     query = context.args[0]
     await update.message.reply_text("🔎 Fetching UPI Info...")
     try:
         url = f"https://nitin-developer-api-paid.nitinshab43.workers.dev/api?action=upiinfo&upi={query}&key={API_KEY}"
-        res = requests.get(url, timeout=10).text
-        await update.message.reply_text(f"💳 **UPI Result:**\n\n`{res[:3500]}`", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text("❌ API Server Response Error.")
+        res = requests.get(url, timeout=12).text
+        formatted = res.replace('"owner": "@FizzaGirl"', '"owner": "@Toolssbysohail"') \
+                       .replace('FizzaGirl', 'sohailcyberexpert')
+        await update.message.reply_text(f"💳 **UPI Result:**\n\n```json\n{formatted[:3500]}\n```", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ API Server Error.")
 
 async def fetch_id_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    status = check_user_and_deduct(user_id)
+    if status == "blocked":
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
+    if status == "no_credits":
+        return await update.message.reply_text("❌ Insufficient Credits!")
     if not context.args:
         return await update.message.reply_text("❌ Usage: /id <12-digit-id>")
-
-    if not deduct_credit(user_id):
-        return await update.message.reply_text("❌ Insufficient Credits!")
 
     query = context.args[0]
     await update.message.reply_text("🔎 Fetching ID Info...")
     try:
         url = f"https://nitin-developer-api-paid.nitinshab43.workers.dev/api?action=aadhar&aadhar={query}&key={API_KEY}"
-        res = requests.get(url, timeout=10).text
-        await update.message.reply_text(f"🆔 **ID Search Result:**\n\n`{res[:3500]}`", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text("❌ API Server Response Error.")
+        res = requests.get(url, timeout=12).text
+        formatted = res.replace('"owner": "@FizzaGirl"', '"owner": "@Toolssbysohail"') \
+                       .replace('FizzaGirl', 'sohailcyberexpert')
+        await update.message.reply_text(f"🆔 **ID Search Result:**\n\n```json\n{formatted[:3500]}\n```", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ API Server Error.")
 
 # --- BASE BOT HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
+
+    cursor.execute("SELECT is_blocked FROM users WHERE user_id = ?", (user.id,))
+    res_b = cursor.fetchone()
+    if res_b and res_b[0] == 1:
+        return await update.message.reply_text("🚫 Aap is bot se blocked hain!")
 
     cursor.execute("SELECT * FROM users WHERE user_id = ?", (user.id,))
     db_user = cursor.fetchone()
@@ -198,6 +238,11 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     today = datetime.now().strftime("%Y-%m-%d")
+
+    cursor.execute("SELECT is_blocked FROM users WHERE user_id = ?", (user_id,))
+    res_b = cursor.fetchone()
+    if res_b and res_b[0] == 1:
+        return await query.message.reply_text("🚫 Aap is bot se blocked hain!")
 
     if query.data == "profile":
         cursor.execute("SELECT credits, username FROM users WHERE user_id = ?", (user_id,))
@@ -260,7 +305,77 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"🎉 Success! Got +{credits} Credits!")
 
-# Admin Command (/gen CODE CREDITS MAX_USES)
+# --- ADMIN COMMANDS SYSTEM ---
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    msg = (
+        "👑 **ADMIN CONTROL PANEL**\n\n"
+        "📊 `/stats` - Total Users & Codes stats\n"
+        "➕ `/addcredit USER_ID AMOUNT` - Add credits\n"
+        "➖ `/removecredit USER_ID AMOUNT` - Deduct credits\n"
+        "🚫 `/block USER_ID` - Block user\n"
+        "✅ `/unblock USER_ID` - Unblock user\n"
+        "🔑 `/gen CODE CREDITS MAX_USES` - Create redeem code\n"
+        "🗑️ `/delcode CODE` - Delete redeem code"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM redeem_codes")
+    total_codes = cursor.fetchone()[0]
+    await update.message.reply_text(f"📊 **BOT STATS**\n\n👥 Total Users: `{total_users}`\n🔑 Active Redeem Codes: `{total_codes}`", parse_mode="Markdown")
+
+async def add_credit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        t_user = int(context.args[0])
+        amt = int(context.args[1])
+        cursor.execute("UPDATE users SET credits = credits + ? WHERE user_id = ?", (amt, t_user))
+        conn.commit()
+        await update.message.reply_text(f"✅ Added +{amt} credits to User `{t_user}`", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ Usage: /addcredit USER_ID AMOUNT")
+
+async def remove_credit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        t_user = int(context.args[0])
+        amt = int(context.args[1])
+        cursor.execute("UPDATE users SET credits = MAX(0, credits - ?) WHERE user_id = ?", (amt, t_user))
+        conn.commit()
+        await update.message.reply_text(f"✅ Deducted {amt} credits from User `{t_user}`", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ Usage: /removecredit USER_ID AMOUNT")
+
+async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        t_user = int(context.args[0])
+        cursor.execute("UPDATE users SET is_blocked = 1 WHERE user_id = ?", (t_user,))
+        conn.commit()
+        await update.message.reply_text(f"🚫 User `{t_user}` has been BLOCKED!", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ Usage: /block USER_ID")
+
+async def unblock_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        t_user = int(context.args[0])
+        cursor.execute("UPDATE users SET is_blocked = 0 WHERE user_id = ?", (t_user,))
+        conn.commit()
+        await update.message.reply_text(f"✅ User `{t_user}` has been UNBLOCKED!", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ Usage: /unblock USER_ID")
+
 async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -271,28 +386,51 @@ async def gen_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         cursor.execute("INSERT INTO redeem_codes (code, credits, max_uses) VALUES (?, ?, ?)", (code, credits, max_uses))
         conn.commit()
-        await update.message.reply_text(f"✅ Code Created: {code}\nCredits: {credits}\nMax Uses: {max_uses}")
-    except Exception as e:
+        await update.message.reply_text(f"✅ Code Created: `{code}`\nCredits: `{credits}`\nMax Uses: `{max_uses}`", parse_mode="Markdown")
+    except Exception:
         await update.message.reply_text("❌ Usage: /gen CODE CREDITS MAX_USES")
+
+async def del_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    if not context.args:
+        return await update.message.reply_text("❌ Usage: /delcode CODE_NAME")
+
+    code_input = context.args[0]
+    cursor.execute("SELECT * FROM redeem_codes WHERE code = ?", (code_input,))
+    if not cursor.fetchone():
+        return await update.message.reply_text("❌ Ye code exist nahi karta!")
+
+    cursor.execute("DELETE FROM redeem_codes WHERE code = ?", (code_input,))
+    conn.commit()
+    await update.message.reply_text(f"🗑️ Redeem Code `{code_input}` deleted!", parse_mode="Markdown")
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Base Commands
+    # User Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("redeem", redeem))
-    app.add_handler(CommandHandler("gen", gen_code))
     
     # API Commands
     app.add_handler(CommandHandler("pincode", fetch_pincode))
     app.add_handler(CommandHandler("vehicle", fetch_vehicle))
+    app.add_handler(CommandHandler("vechile", fetch_vehicle)) # Backup typo handler
     app.add_handler(CommandHandler("num", fetch_num))
     app.add_handler(CommandHandler("upi", fetch_upi))
     app.add_handler(CommandHandler("id", fetch_id_info))
 
+    # Admin Commands
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("addcredit", add_credit))
+    app.add_handler(CommandHandler("removecredit", remove_credit))
+    app.add_handler(CommandHandler("block", block_user))
+    app.add_handler(CommandHandler("unblock", unblock_user))
+    app.add_handler(CommandHandler("gen", gen_code))
+    app.add_handler(CommandHandler("delcode", del_code))
+
     app.add_handler(CallbackQueryHandler(button_click))
 
-    print("🤖 Starting Bot with API Handlers...")
-    
-    # Python 3.13 compatibility fix for polling
+    print("🤖 Starting Bot with Full Admin Panel & API Fixes...")
     app.run_polling(drop_pending_updates=True, close_loop=False)
