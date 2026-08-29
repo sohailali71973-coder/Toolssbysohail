@@ -293,4 +293,6 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(button_click))
 
     print("🤖 Starting Bot with API Handlers...")
-    app.run_polling(drop_pending_updates=True)
+    
+    # Python 3.13 compatibility fix for polling
+    app.run_polling(drop_pending_updates=True, close_loop=False)
